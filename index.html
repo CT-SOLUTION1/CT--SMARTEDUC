@@ -134,11 +134,11 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
       <b>Important:</b> Teacher and Learner codes must be exactly 6 characters (Firebase Authentication requires passwords of at least 6 characters). They are securely hashed in the browser before being stored in Firebase.
     </div>
 
-    <label>Founder Code</label>
-    <input id="setupFounderCode" type="password" autocomplete="new-password" placeholder="4-character Founder code" maxlength="4" minlength="4">
+    <label>Founder Code (exactly 6 characters)</label>
+    <input id="setupFounderCode" type="password" autocomplete="new-password" placeholder="6-character Founder code" maxlength="6" minlength="6">
 
     <label>Confirm Founder Code</label>
-    <input id="setupFounderConfirm" type="password" autocomplete="new-password" placeholder="Confirm 4-character code" maxlength="4" minlength="4">
+    <input id="setupFounderConfirm" type="password" autocomplete="new-password" placeholder="Confirm 6-character code" maxlength="6" minlength="6">
 
     <label>Teacher Code (exactly 6 characters)</label>
     <input id="setupTeacherCode" type="password" autocomplete="new-password" placeholder="6-character Teacher code" maxlength="6" minlength="6">
@@ -264,11 +264,11 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
       <span class="info">Changing your own Founder code requires your current code for verification. This updates the Firebase Authentication account used to sign in as Founder.</span>
     </div>
     <label>Current Founder Code</label>
-    <input id="currentFounderCodeInput" type="password" autocomplete="off" placeholder="Enter your current founder code" maxlength="4" minlength="4">
-    <label>New Founder Code (exactly 4 characters)</label>
-    <input id="newFounderCode" type="password" autocomplete="new-password" placeholder="Enter new founder code" maxlength="4" minlength="4">
+    <input id="currentFounderCodeInput" type="password" autocomplete="off" placeholder="Enter your current founder code" maxlength="6" minlength="6">
+    <label>New Founder Code (exactly 6 characters)</label>
+    <input id="newFounderCode" type="password" autocomplete="new-password" placeholder="Enter new founder code" maxlength="6" minlength="6">
     <label>Confirm New Founder Code</label>
-    <input id="newFounderCodeConfirm" type="password" autocomplete="new-password" placeholder="Confirm new founder code" maxlength="4" minlength="4">
+    <input id="newFounderCodeConfirm" type="password" autocomplete="new-password" placeholder="Confirm new founder code" maxlength="6" minlength="6">
     <button class="blue wide" onclick="changeFounderAccessCode()">Change Founder Access Code</button>
 
     <hr style="border:0;border-top:1px solid var(--border);margin:24px 0">
@@ -573,7 +573,7 @@ async function initializeSchool(){
     return;
   }
 
-  if(founder.length!==4){ status.textContent='Founder code must be exactly 4 characters.'; return; }
+  if(founder.length!==6){ status.textContent='Founder code must be exactly 6 characters.'; return; }
   if(founder!==founderConfirm){
     status.textContent='Founder code and confirmation do not match.';
     return;
@@ -875,8 +875,8 @@ async function changeFounderAccessCode(){
   const newCode=validateFounderCode(document.getElementById('newFounderCode').value);
   const confirmCode=validateFounderCode(document.getElementById('newFounderCodeConfirm').value);
 
-  if(currentCode.length!==4){ alert('Please enter your current 4-character Founder code.'); return; }
-  if(newCode.length!==4){ alert('New Founder code must be exactly 4 characters.'); return; }
+  if(currentCode.length!==6){ alert('Please enter your current 6-character Founder code.'); return; }
+  if(newCode.length!==6){ alert('New Founder code must be exactly 6 characters.'); return; }
   if(newCode!==confirmCode){ alert('New Founder code and confirmation do not match.'); return; }
   if(newCode===currentCode){ alert('New Founder code must be different from the current code.'); return; }
 
