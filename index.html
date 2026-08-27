@@ -40,7 +40,41 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
 @media(max-width:600px){.dashboard-choice{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dashboard-tile{padding:16px 8px}.dashboard-tile .tile-icon{font-size:2rem}.dashboard-tile h2{font-size:1.05rem}.dashboard-tile p{font-size:.78rem}}
 @media(max-width:900px){.grid,.meeting-layout{grid-template-columns:1fr}.meeting{height:520px}.waiting{order:-1}}
 </style>
-<script src="https://meet.jit.si/external_api.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signInWithCustomToken,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+  import {
+    getFunctions,
+    httpsCallable
+  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-functions.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAazmoaEKQzdF9rXh7rPDNocml6lduhcB4",
+    authDomain: "ct-e-school-solutions.firebaseapp.com",
+    projectId: "ct-e-school-solutions",
+    storageBucket: "ct-e-school-solutions.firebasestorage.app",
+    messagingSenderId: "710981788315",
+    appId: "1:710981788315:web:d6c159734aa3cca3791c3e"
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  window.firebaseAuth = getAuth(firebaseApp);
+  window.firebaseFunctions = getFunctions(firebaseApp, "us-central1");
+  window.firebaseApi = {
+    signInWithEmailAndPassword,
+    signInWithCustomToken,
+    signOut,
+    onAuthStateChanged,
+    httpsCallable
+  };
+</script>
+
 </head>
 <body>
 <header>
@@ -48,7 +82,7 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
 <div class="brand">🎓 CT-SMART EDUC<span class="tag">Anywhere, Learn, Understand, Apply</span><span style="display:block;color:#ffffff;font-size:.72rem;margin-top:6px;letter-spacing:.5px">HOST: DADDY FAVOUR | CONTACT: 0757132542 / 0786814513 / 0755694263</span></div>
 <div class="hero" id="introHero" style="display:none">
 <h1>Temporary Codes.<br><span>Teacher-Controlled Entry.</span></h1>
-<p>The teacher starts a live lesson, activates the waiting lobby, and sees learners who are waiting. The teacher then chooses <b>Accept</b> or <b>Reject</b> for each learner.</p>
+<p>The teacher starts a live lesson using the built-in Google Meet room. Teachers and learners use the same Google Meet link, while Google Meet provides the actual meeting and participant controls.</p>
 </div>
 </div>
 </header>
@@ -56,12 +90,50 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
 <section id="setup">
 <div class="container">
 
+<div id="firstSetup" class="dashboard-panel" style="display:none">
+  <div class="access-box">
+    <h2>⚙️ CT-SMART EDUC — First-Time Setup</h2>
+    <p class="info">Create your own Founder, Teacher and shared Learner access codes. There are no built-in codes.</p>
+    <div class="notice">
+      <b>Important:</b> These codes will become the school's central access codes. You choose them yourself.
+    </div>
+
+    <label>Founder Code</label>
+    <input id="setupFounderCode" type="password" autocomplete="new-password" placeholder="Create Founder code">
+
+    <label>Confirm Founder Code</label>
+    <input id="setupFounderConfirm" type="password" autocomplete="new-password" placeholder="Confirm Founder code">
+
+    <label>Teacher Code</label>
+    <input id="setupTeacherCode" type="password" autocomplete="new-password" placeholder="Create Teacher code">
+
+    <label>Confirm Teacher Code</label>
+    <input id="setupTeacherConfirm" type="password" autocomplete="new-password" placeholder="Confirm Teacher code">
+
+    <label>Shared Learner Code</label>
+    <input id="setupLearnerCode" type="password" autocomplete="new-password" placeholder="Create one code for all learners">
+
+    <label>Confirm Learner Code</label>
+    <input id="setupLearnerConfirm" type="password" autocomplete="new-password" placeholder="Confirm Learner code">
+
+    <button class="green wide" onclick="initializeSchool()">Save & Activate CT-SMART EDUC</button>
+    <p id="setupStatus" class="info" style="margin-top:12px;text-align:center"></p>
+  </div>
+</div>
+
 <div id="dashboardChoice">
   <div class="card">
     <h1 style="text-align:center;margin-bottom:8px">Choose Your Dashboard</h1>
     <p class="info" style="text-align:center">Select the dashboard that matches your role.</p>
 
     <div class="dashboard-choice">
+      <div class="dashboard-tile" onclick="openFounderAccess()">
+        <div class="tile-icon">👑</div>
+        <h2>Founder</h2>
+        <p>Secure management of Teacher and Learner access codes.</p>
+      </div>
+
+      
       <div class="dashboard-tile" onclick="openTeacherAccess()">
         <div class="tile-icon">👨‍🏫</div>
         <h2>Teacher</h2>
@@ -71,7 +143,7 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
       <div class="dashboard-tile" onclick="openLearnerDashboard()">
         <div class="tile-icon">🎓</div>
         <h2>Learner</h2>
-        <p>Join a live lesson using your lesson code.</p>
+        <p>Enter with the learner access code and join the live lesson.</p>
       </div>
 
       <div class="dashboard-tile" onclick="openFounderAccess()">
@@ -109,9 +181,9 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
       <label>Lesson Title</label><input id="lessonTitle" placeholder="e.g. Algebra Revision">
       <button class="green wide" onclick="startTeacherLesson()">Create Code & Start Teacher Room</button>
       <div id="teacherCodeBox" class="codebox">
-        <div class="info">SHARE THIS TEMPORARY LESSON CODE</div>
+        <div class="info">GOOGLE MEET LIVE LESSON</div>
         <div id="teacherCode" class="code"></div>
-        <p class="info">Learners enter this code and their name. When the lobby is active, they wait until you accept them.</p>
+        <p class="info">The live lesson opens in the fixed Google Meet room. Learners use the same Google Meet link.</p>
       </div>
     </div>
   </div>
@@ -121,7 +193,7 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
   <div class="access-box">
     <button class="back-btn" onclick="backToDashboard()">← Back</button>
     <h2>👑 Founder Access</h2>
-    <p class="info">Enter the built-in founder code to open the control panel.</p>
+    <p class="info">Enter the Founder access code configured for the secure Firebase Founder account.</p>
     <label>Founder Access Code</label>
     <input id="founderAccessCode" type="password" placeholder="Enter founder code">
     <button class="green wide" onclick="verifyFounderAccess()">Open Founder Panel</button>
@@ -132,9 +204,10 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
   <div class="card">
     <button class="back-btn" onclick="backToDashboard()">← Dashboard</button>
     <h2>👑 Founder Control Panel</h2>
+    <div class="notice"><b>Central access control:</b> Change the shared Teacher and Learner codes here. Changes apply to all devices after Firebase is updated.</div>
     <div class="notice" style="margin-bottom:18px">
       <b>Security control:</b><br>
-      <span class="info">These controls are stored in this browser. A true server-wide lock or centrally shared access code requires a backend/database.</span>
+      <span class="info">Teacher, learner and founder accounts are authenticated centrally by Firebase Authentication. No anonymous accounts are created and access is not stored in browser localStorage.</span>
     </div>
 
     <h3>🔐 Teacher Access Code</h3>
@@ -142,7 +215,18 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
     <input id="currentTeacherCode" type="password" readonly>
     <label>New Teacher Access Code</label>
     <input id="newTeacherCode" type="password" placeholder="Enter a new code">
+    <button id="saveBothAccessCodes" class="green wide" type="button" onclick="saveBothAccessCodes()">Save Teacher + Learner Codes Securely</button>
+
     <button class="blue wide" onclick="changeTeacherAccessCode()">Change Teacher Access Code</button>
+
+    <hr style="border:0;border-top:1px solid var(--border);margin:24px 0">
+
+    <h3>🎓 Learner Access Code</h3>
+    <label>Current Learner Access Code</label>
+    <input id="currentLearnerCode" type="password" readonly>
+    <label>New Learner Access Code</label>
+    <input id="newLearnerCode" type="password" placeholder="Enter a new learner code">
+    <button class="blue wide" onclick="changeLearnerAccessCode()">Change Learner Access Code</button>
 
     <hr style="border:0;border-top:1px solid var(--border);margin:24px 0">
     <h3>🔒 User Access Locks</h3>
@@ -163,6 +247,10 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
   <div class="card">
     <button class="back-btn" onclick="backToDashboard()">← Back</button>
     <h2>🎓 Learner Dashboard: Join Lesson</h2>
+    <div class="notice" style="margin-bottom:18px">
+      <b>🔐 Learner Access</b><br>
+      <span class="info">Enter the learner access code from the CT-SMART EDUC administrator/founder before accessing this lesson area.</span>
+    </div>
     <div style="padding:16px;margin:0 0 18px;border-radius:10px;background:#fff0f0;border:2px solid var(--danger);color:#a51f1f;font-weight:900;text-align:center;line-height:1.5;text-transform:uppercase">
       ⚠️ IMPORTANT WARNING: ONLY LEARNERS WHOSE NAMES ARE RECOGNIZED SHALL BE ACCEPTED TO JOIN THE LESSON.
     </div>
@@ -183,8 +271,16 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
         <span>I confirm that I have read, understood, and accepted the live lesson rules.</span>
       </label>
     </div>
-    <label>Your Name</label><input id="learnerName" placeholder="Enter your name">
-    <label>Temporary Lesson Code</label><input id="learnerCode" placeholder="e.g. CT-MATH-4827" style="text-transform:uppercase">
+    <label>Registered Learner Access Code</label>
+    <div style="display:flex;gap:8px">
+      <input id="learnerAccessCode" type="password" placeholder="Enter your registered code" style="flex:1">
+      <button type="button" class="blue" onclick="authenticateLearner()">Verify</button>
+    </div>
+    <label>Your Name</label><input id="learnerName" placeholder="Enter your registered name">
+    <div class="notice" style="margin-top:10px">
+      <b>📹 Google Meet Room</b><br>
+      <span class="info">This system is connected to the fixed Google Meet room. No temporary lesson code is required.</span>
+    </div>
     <button id="joinButton" class="blue wide" onclick="startLearnerLesson()" disabled style="opacity:.45;cursor:not-allowed">Read & Accept Rules to Join</button>
     <div class="notice" style="margin-top:18px">
       <b>Waiting access:</b><br><span class="info">After joining, you may be placed in the waiting lobby. The teacher sees your request and decides whether to <b>Accept</b> or <b>Reject</b> it.</span>
@@ -202,11 +298,46 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
 <div id="meetingStatus" class="info">Connecting to live lesson...</div>
 </div>
 <div class="meeting-layout">
-<div id="meet" class="meeting"></div>
+<div class="meeting" style="background:#fff;color:#172033;padding:28px;display:flex;align-items:center;justify-content:center;text-align:center">
+  <div style="max-width:680px;width:100%">
+    <div style="font-size:4rem;margin-bottom:10px">🎓</div>
+    <h2 style="margin-bottom:10px">CT-SMART EDUC — Live Lesson Room</h2>
+    <p class="info" style="font-size:1rem">
+      You have entered the lesson room through the CT-SMART EDUC website.
+      Your lesson is connected to the school's Google Meet room.
+    </p>
+
+    <div class="notice" style="margin:20px 0;text-align:left">
+      <b>📡 Connected Lesson Room</b><br>
+      <span class="info">
+        Meeting: CT-SMART EDUC Live Class<br>
+        Connection: Google Meet<br>
+        Room: ipj-aihy-oou
+      </span>
+    </div>
+
+    <button class="green wide" onclick="connectGoogleMeet()">
+      🎥 Connect to Live Lesson
+    </button>
+
+    <div id="meetConnectionStatus" class="info" style="margin-top:14px">
+      Waiting to connect...
+    </div>
+  </div>
+</div>
+
 <div id="teacherWaitingPanel" class="waiting" style="display:none">
-<h3>⏳ Waiting Learners <span id="waitCount" class="count">0</span></h3>
-<div id="waitingList"><div class="empty">No learners are waiting.</div></div>
-<p class="info">Use <b>Accept</b> to admit a learner or <b>Reject</b> to deny entry.</p>
+<h3>👨‍🏫 Teacher Controls</h3>
+<div class="notice">
+  <b>Your lesson room is connected.</b><br>
+  <span class="info">
+    The CT-SMART EDUC website controls access to this lesson page. Google Meet handles
+    the live audio/video meeting and its participant controls.
+  </span>
+</div>
+<p class="info" style="margin-top:14px">
+  Learners who enter through the website are directed to the same Google Meet classroom.
+</p>
 </div>
 </div>
 </div>
@@ -215,7 +346,6 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
 <footer>© 2026 CT-SMART EDUC — Anywhere, Learn, Understand, Apply</footer>
 
 <script>
-let api=null;
 let activeCode='';
 let isTeacher=false;
 const waiting=new Map();
@@ -224,9 +354,6 @@ function makeCode(){
   const subject=document.getElementById('subject').value.toUpperCase().replace(/[^A-Z]/g,'').slice(0,5);
   return 'CT-'+subject+'-'+Math.floor(1000+Math.random()*9000);
 }
-function roomFromCode(code){
-  return 'CTSMARTEDUC-'+code.trim().toUpperCase().replace(/[^A-Z0-9-]/g,'');
-}
 function showMeeting(code,title){
   activeCode=code;
   document.getElementById('setup').style.display='none';
@@ -234,52 +361,15 @@ function showMeeting(code,title){
   document.getElementById('roomHeading').textContent=title;
   document.getElementById('roomCodePill').textContent=code;
 }
-function createApi(code,displayName,teacher){
-  if(typeof JitsiMeetExternalAPI==='undefined'){
-    alert('The live meeting service did not load. Please check your internet connection.');
-    return;
-  }
-  const domain='meet.jit.si';
-  api=new JitsiMeetExternalAPI(domain,{
-    roomName:roomFromCode(code),
-    width:'100%',
-    height:'100%',
-    parentNode:document.querySelector('#meet'),
-    userInfo:{displayName:displayName},
-    configOverwrite:{
-      prejoinConfig:{enabled:true},
-      lobby:{autoKnock:true,enableChat:false}
-    }
-  });
 
-  api.addListener('videoConferenceJoined',()=>{
-    document.getElementById('meetingStatus').textContent='You are in the live lesson.';
-  });
 
-  if(teacher){
-    api.addListener('participantRoleChanged',(event)=>{
-      if(event.role==='moderator'){
-        document.getElementById('meetingStatus').textContent='Teacher controls ready. Activating waiting lobby...';
-        try{
-          api.executeCommand('toggleLobby',true);
-          document.getElementById('meetingStatus').textContent='Waiting lobby is active. Learners must wait for your decision.';
-        }catch(e){
-          document.getElementById('meetingStatus').textContent='Lobby control may depend on the meeting service configuration.';
-        }
-      }
-    });
-
-    api.addListener('knockingParticipant',(event)=>{
-      const p=event.participant;
-      if(!p || !p.id) return;
-      waiting.set(p.id,{id:p.id,name:p.name||'Unnamed learner'});
-      renderWaiting();
-    });
-  }else{
-    document.getElementById('meetingStatus').textContent='Join the meeting. If the teacher has activated the lobby, wait for acceptance.';
-  }
+function connectGoogleMeet(){
+  const status=document.getElementById('meetConnectionStatus');
+  if(status) status.textContent='Opening the CT-SMART EDUC Google Meet classroom...';
+  window.open(GOOGLE_MEET_LINK,'_blank','noopener,noreferrer');
 }
 function hideDashboards(){
+  document.getElementById('firstSetup').style.display='none';
   document.getElementById('dashboardChoice').style.display='none';
   document.getElementById('teacherAccess').style.display='none';
   document.getElementById('teacherDashboard').style.display='none';
@@ -293,40 +383,158 @@ function backToDashboard(){
   document.getElementById('dashboardChoice').style.display='block';
 }
 
-const DEFAULT_TEACHER_ACCESS_CODE='EDUC';
-const LUCK_ACCESS_CODE='LUCK';
+/*
+  Firebase authentication:
+  - No anonymous Firebase accounts are created.
+  - There are no built-in school access codes.
+  - The first-time setup creates the school's Founder, Teacher and shared Learner codes.
+  - The secure Firebase backend stores the codes centrally.
+  - Learners share one school Learner code; teachers share one school Teacher code.
+  - The Founder code is used only for the Founder Panel.
+*/
+const SYSTEM_EMAIL_DOMAIN='ctsmart.educ';
+const GOOGLE_MEET_LINK='https://meet.google.com/ipj-aihy-oou';
 
-function getTeacherAccessCode(){
-  return localStorage.getItem('ctsmart_teacher_access_code') || DEFAULT_TEACHER_ACCESS_CODE;
+function normalizeCode(code){
+  return (code||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
 }
 
-function isLocked(type){
-  return localStorage.getItem('ctsmart_lock_'+type)==='true';
+function systemEmail(role,code){
+  return role.toLowerCase()+'.'+normalizeCode(code).toLowerCase()+'@'+SYSTEM_EMAIL_DOMAIN;
+}
+
+async function callFunction(name,data){
+  const fn=window.firebaseApi.httpsCallable(window.firebaseFunctions,name);
+  const result=await fn(data||{});
+  return result.data;
+}
+
+async function authenticateWithCode(role,code){
+  const clean=normalizeCode(code);
+  if(!clean) throw new Error('Please enter an access code.');
+
+  try{
+    const call=window.firebaseApi.httpsCallable(
+      window.firebaseFunctions,'verifySharedAccessCode'
+    );
+    const result=await call({role,code:clean});
+    if(!result.data || !result.data.ok || !result.data.customToken){
+      throw new Error('Access denied.');
+    }
+    const userCredential=await window.firebaseApi.signInWithCustomToken(
+      window.firebaseAuth,
+      result.data.customToken
+    );
+    return {
+      ...result.data,
+      uid:userCredential.user.uid,
+      displayName:userCredential.user.displayName || ''
+    };
+  }catch(err){
+    console.error(err);
+    const message=err?.message || 'Unable to verify access code.';
+    throw new Error(message);
+  }
+}
+
+const FOUNDER_EMAIL='founder@ctsmart.educ';
+
+async function saveAccessSettings(){
+  const call=window.firebaseApi.httpsCallable(
+    window.firebaseFunctions,'setSchoolAccessCodes'
+  );
+  return call({
+    learnerCode:accessSettings.learnerCode,
+    teacherCode:accessSettings.teacherCode
+  });
+}
+
+let accessSettings={
+  learnerCode:'',
+  teacherCode:'',
+  learnerLocked:false,
+  teacherLocked:false
+};
+
+async function loadAccessSettings(){
+  try{
+    const call=window.firebaseApi.httpsCallable(
+      window.firebaseFunctions,'getSchoolAccessSettings'
+    );
+    const result=await call({});
+    const d=result.data || {};
+    accessSettings.configured=!!d.configured;
+    accessSettings.learnerLocked=!!d.learnerLocked;
+    accessSettings.teacherLocked=!!d.teacherLocked;
+    accessSettings.learnerCodeMasked=d.learnerCodeMasked || '';
+    accessSettings.teacherCodeMasked=d.teacherCodeMasked || '';
+  }catch(err){
+    console.error('Could not load secure access settings:',err);
+  }
+  return accessSettings;
+}
+
+function getConfiguredCode(role){ return accessSettings[role+'Code'] || ''; }
+
+async function initializeSchool(){
+  const founder=normalizeCode(document.getElementById('setupFounderCode').value);
+  const founderConfirm=normalizeCode(document.getElementById('setupFounderConfirm').value);
+  const teacher=normalizeCode(document.getElementById('setupTeacherCode').value);
+  const teacherConfirm=normalizeCode(document.getElementById('setupTeacherConfirm').value);
+  const learner=normalizeCode(document.getElementById('setupLearnerCode').value);
+  const learnerConfirm=normalizeCode(document.getElementById('setupLearnerConfirm').value);
+  const status=document.getElementById('setupStatus');
+
+  if(founder.length<4 || teacher.length<4 || learner.length<4){
+    status.textContent='Each code must contain at least 4 characters.';
+    return;
+  }
+  if(founder!==founderConfirm || teacher!==teacherConfirm || learner!==learnerConfirm){
+    status.textContent='The confirmation codes do not match.';
+    return;
+  }
+  if(new Set([founder,teacher,learner]).size<3){
+    status.textContent='Founder, Teacher and Learner codes must be different.';
+    return;
+  }
+
+  status.textContent='Activating the system securely...';
+  try{
+    const call=window.firebaseApi.httpsCallable(
+      window.firebaseFunctions,'initializeSchoolAccess'
+    );
+    await call({founderCode:founder,teacherCode:teacher,learnerCode:learner});
+    status.textContent='System activated successfully.';
+    accessSettings.configured=true;
+    accessSettings.learnerCode=learner;
+    accessSettings.teacherCode=teacher;
+    hideDashboards();
+    document.getElementById('dashboardChoice').style.display='block';
+  }catch(err){
+    console.error('Initial setup failed:',err);
+    status.textContent=err?.message || 'Initial setup failed.';
+    alert(
+      'The system could not complete first-time setup. '+
+      'Make sure the secure Firebase initializeSchoolAccess Cloud Function is deployed.'
+    );
+  }
 }
 
 function openTeacherAccess(){
-  if(isLocked('teacher')){ alert('Teacher access is currently locked by the founder.'); return; }
   hideDashboards();
   document.getElementById('teacherAccess').style.display='block';
   document.getElementById('teacherAccessCode').value='';
   setTimeout(()=>document.getElementById('teacherAccessCode').focus(),50);
 }
 
-function verifyTeacherAccess(){
-  if(isLocked('teacher')){ alert('Teacher access is currently locked by the founder.'); return; }
-  const code=document.getElementById('teacherAccessCode').value.trim().toUpperCase();
-  if(code!==getTeacherAccessCode().toUpperCase()){
-    alert('Incorrect teacher access code. Please enter the correct code.');
-    return;
-  }
-  hideDashboards();
-  document.getElementById('teacherDashboard').style.display='block';
-}
-
 function openLearnerDashboard(){
-  if(isLocked('learner')){ alert('Learner access is currently locked by the founder.'); return; }
   hideDashboards();
   document.getElementById('learnerDashboard').style.display='block';
+  if(document.getElementById('learnerAccessCode')) document.getElementById('learnerAccessCode').value='';
+  document.getElementById('learnerName').value='';
+  document.getElementById('rulesAccepted').checked=false;
+  document.getElementById('learnerDashboard').dataset.authenticated='false';
+  toggleJoinButton();
 }
 
 function openFounderAccess(){
@@ -336,61 +544,153 @@ function openFounderAccess(){
   setTimeout(()=>document.getElementById('founderAccessCode').focus(),50);
 }
 
-function verifyFounderAccess(){
-  const code=document.getElementById('founderAccessCode').value.trim().toUpperCase();
-  if(code!==LUCK_ACCESS_CODE){
-    alert('Incorrect founder access code.');
+async function verifyTeacherAccess(){
+  try{
+    await authenticateWithCode('teacher',document.getElementById('teacherAccessCode').value);
+    hideDashboards();
+    document.getElementById('teacherDashboard').style.display='block';
+  }catch(err){
+    alert(err.message);
+  }
+}
+
+async function verifyFounderAccess(){
+  const code=document.getElementById('founderAccessCode').value;
+  try{
+    await signInFounder(code);
+    hideDashboards();
+    document.getElementById('founderDashboard').style.display='block';
+    loadFounderSettings();
+  }catch(err){
+    alert(err.message || 'Founder authentication failed.');
+  }
+}
+
+async function signInFounder(code){
+  const clean=normalizeCode(code);
+  if(!clean) throw new Error('Please enter the Founder access code.');
+  const call=window.firebaseApi.httpsCallable(
+    window.firebaseFunctions,'verifyFounderAccess'
+  );
+  const result=await call({code:clean});
+  if(!result.data || !result.data.ok || !result.data.customToken){
+    throw new Error('Incorrect Founder access code.');
+  }
+  await window.firebaseApi.signInWithCustomToken(
+    window.firebaseAuth,
+    result.data.customToken
+  );
+  return result.data;
+}
+
+async function authenticateLearner(){
+  const code=document.getElementById('learnerAccessCode').value;
+  try{
+    const user=await authenticateWithCode('learner',code);
+    document.getElementById('learnerDashboard').dataset.authenticated='true';
+    document.getElementById('learnerDashboard').dataset.userUid=user.uid;
+    document.getElementById('learnerName').value=
+      user.displayName || document.getElementById('learnerName').value || '';
+    alert('Learner account recognized. You may now join the lesson.');
+    return true;
+  }catch(err){
+    document.getElementById('learnerDashboard').dataset.authenticated='false';
+    alert(err.message);
+    return false;
+  }
+}
+
+async function loadFounderSettings(){
+  await loadAccessSettings();
+  document.getElementById('currentTeacherCode').value=accessSettings.teacherCodeMasked || 'Not configured';
+  document.getElementById('currentLearnerCode').value=accessSettings.learnerCodeMasked || 'Not configured';
+  document.getElementById('newTeacherCode').value='';
+  document.getElementById('newLearnerCode').value='';
+  document.getElementById('lockTeacher').checked=!!accessSettings.teacherLocked;
+  document.getElementById('lockLearner').checked=!!accessSettings.learnerLocked;
+}
+
+async function saveBothAccessCodes(){
+  const teacher=normalizeCode(document.getElementById('newTeacherCode').value);
+  const learner=normalizeCode(document.getElementById('newLearnerCode').value);
+  if(teacher.length<4 || learner.length<4){
+    alert('Enter both a Teacher code and a Learner code, each at least 4 characters.');
     return;
   }
-  hideDashboards();
-  document.getElementById('founderDashboard').style.display='block';
-  loadFounderSettings();
+  try{
+    const call=window.firebaseApi.httpsCallable(
+      window.firebaseFunctions,'setSchoolAccessCodes'
+    );
+    await call({teacherCode:teacher,learnerCode:learner});
+    document.getElementById('newTeacherCode').value='';
+    document.getElementById('newLearnerCode').value='';
+    await loadAccessSettings();
+    document.getElementById('currentTeacherCode').value=accessSettings.teacherCodeMasked || 'Configured';
+    document.getElementById('currentLearnerCode').value=accessSettings.learnerCodeMasked || 'Configured';
+    alert('Teacher and Learner access codes have been updated securely.');
+  }catch(err){
+    alert(err?.message || 'Unable to update access codes.');
+  }
 }
 
-function loadFounderSettings(){
-  document.getElementById('currentTeacherCode').value=getTeacherAccessCode();
-  document.getElementById('newTeacherCode').value='';
-  document.getElementById('lockTeacher').checked=isLocked('teacher');
-  document.getElementById('lockLearner').checked=isLocked('learner');
-}
-
-function changeTeacherAccessCode(){
-  const newCode=document.getElementById('newTeacherCode').value.trim();
+async function changeTeacherAccessCode(){
+  const newCode=normalizeCode(document.getElementById('newTeacherCode').value);
   if(newCode.length<4){ alert('Teacher access code must contain at least 4 characters.'); return; }
-  localStorage.setItem('ctsmart_teacher_access_code',newCode);
-  document.getElementById('currentTeacherCode').value=newCode;
-  document.getElementById('newTeacherCode').value='';
-  alert('Teacher access code changed successfully.');
+  try{
+    const call=window.firebaseApi.httpsCallable(window.firebaseFunctions,'setTeacherAccessCode');
+    await call({teacherCode:newCode});
+    document.getElementById('newTeacherCode').value='';
+    await loadFounderSettings();
+    alert('Teacher access code updated securely in Firebase.');
+  }catch(err){ alert(err?.message || 'Unable to update the teacher code.'); }
 }
 
-function saveLocks(){
-  localStorage.setItem('ctsmart_lock_teacher',document.getElementById('lockTeacher').checked);
-  localStorage.setItem('ctsmart_lock_learner',document.getElementById('lockLearner').checked);
-  alert('Access settings saved.');
+async function changeLearnerAccessCode(){
+  const newCode=normalizeCode(document.getElementById('newLearnerCode').value);
+  if(newCode.length<4){ alert('Learner access code must contain at least 4 characters.'); return; }
+  try{
+    const call=window.firebaseApi.httpsCallable(window.firebaseFunctions,'setLearnerAccessCode');
+    await call({learnerCode:newCode});
+    document.getElementById('newLearnerCode').value='';
+    await loadFounderSettings();
+    alert('Learner access code updated securely in Firebase.');
+  }catch(err){ alert(err?.message || 'Unable to update the learner code.'); }
 }
-
-function lockAllUsers(){
-  localStorage.setItem('ctsmart_lock_teacher','true');
-  localStorage.setItem('ctsmart_lock_learner','true');
-  loadFounderSettings();
-  alert('Teacher and learner access are now locked.');
+async function saveLocks(){
+  const learnerLocked=document.getElementById('lockLearner').checked;
+  const teacherLocked=document.getElementById('lockTeacher').checked;
+  try{
+    const call=window.firebaseApi.httpsCallable(
+      window.firebaseFunctions,'setSchoolAccessLocks'
+    );
+    await call({learnerLocked,teacherLocked});
+    accessSettings.learnerLocked=learnerLocked;
+    accessSettings.teacherLocked=teacherLocked;
+    alert('Access lock settings saved securely in Firebase.');
+  }catch(err){
+    alert(err?.message || 'Unable to save access lock settings.');
+  }
 }
-
-function unlockAllUsers(){
-  localStorage.setItem('ctsmart_lock_teacher','false');
-  localStorage.setItem('ctsmart_lock_learner','false');
-  loadFounderSettings();
-  alert('Teacher and learner access are now unlocked.');
+async function lockAllUsers(){
+  document.getElementById('lockTeacher').checked=true;
+  document.getElementById('lockLearner').checked=true;
+  await saveLocks();
 }
-
-function applyAccessLocks(){
-  const teacherTile=document.querySelector('.dashboard-tile[onclick="openTeacherAccess()"]');
-  const learnerTile=document.querySelector('.dashboard-tile[onclick="openLearnerDashboard()"]');
-  if(teacherTile){ teacherTile.style.opacity=isLocked('teacher')?'.5':'1'; }
-  if(learnerTile){ learnerTile.style.opacity=isLocked('learner')?'.5':'1'; }
+async function unlockAllUsers(){
+  document.getElementById('lockTeacher').checked=false;
+  document.getElementById('lockLearner').checked=false;
+  await saveLocks();
 }
+function applyAccessLocks(){}
 
-window.addEventListener('load',applyAccessLocks);
+async function signOutCurrentUser(){
+  try{
+    await window.firebaseApi.signOut(window.firebaseAuth);
+  }catch(err){
+    console.error(err);
+  }
+  backToDashboard();
+}
 
 function addSubject(){
   const name=prompt('Enter the subject name:');
@@ -415,7 +715,7 @@ function startTeacherLesson(){
   document.getElementById('teacherCodeBox').style.display='block';
   isTeacher=true;
   document.getElementById('teacherWaitingPanel').style.display='block';
-  showMeeting(code,document.getElementById('lessonTitle').value.trim()||'Teacher Live Lesson');
+  showMeeting(code,document.getElementById('lessonTitle').value.trim()||'Google Meet Live Lesson');
   createApi(code,name,true);
 }
 function toggleJoinButton(){
@@ -432,38 +732,53 @@ function startLearnerLesson(){
     return;
   }
   const name=document.getElementById('learnerName').value.trim();
-  const code=document.getElementById('learnerCode').value.trim().toUpperCase();
-  if(!name){alert('Please enter your name.');return;}
-  if(!/^CT-[A-Z]+-\d{4}$/.test(code)){alert('Enter a valid lesson code, for example CT-MATH-4827.');return;}
-  isTeacher=false;
-  showMeeting(code,'Live Lesson');
-  createApi(code,name,false);
-}
-function renderWaiting(){
-  const list=document.getElementById('waitingList');
-  document.getElementById('waitCount').textContent=waiting.size;
-  if(waiting.size===0){list.innerHTML='<div class="empty">No learners are waiting.</div>';return;}
-  list.innerHTML='';
-  waiting.forEach(p=>{
-    const item=document.createElement('div');
-    item.className='waiter';
-    item.innerHTML='<div class="waiter-name">👤 '+escapeHtml(p.name)+'</div>';
-    const actions=document.createElement('div');actions.className='waiter-actions';
-    const accept=document.createElement('button');accept.className='green';accept.textContent='✓ Accept';
-    accept.onclick=()=>answerWaiting(p.id,true);
-    const reject=document.createElement('button');reject.className='red';reject.textContent='✕ Reject';
-    reject.onclick=()=>answerWaiting(p.id,false);
-    actions.append(accept,reject);item.appendChild(actions);list.appendChild(item);
-  });
-}
-function answerWaiting(id,approved){
-  if(api){
-    try{api.executeCommand('answerKnockingParticipant',id,approved);}
-    catch(e){alert('The meeting service could not process this request.');return;}
+  if(!name){alert('Please enter your registered name.');return;}
+  if(document.getElementById('learnerDashboard').dataset.authenticated!=='true'){
+    alert('Please verify your registered learner access code first.');
+    return;
   }
-  waiting.delete(id);renderWaiting();
+  isTeacher=false;
+  showMeeting('GOOGLE-MEET','Google Meet Live Lesson');
+  document.getElementById('meetConnectionStatus').textContent=
+    'Account verified. Tap Connect to Live Lesson to open Google Meet.';
 }
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+</script>
+<script>
+
+
+window.addEventListener('load',async()=>{
+  hideDashboards();
+  let configured=false;
+  try{
+    const result=await window.firebaseApi.httpsCallable(
+      window.firebaseFunctions,'getSchoolAccessSettings'
+    )({});
+    configured=!!(result.data && result.data.configured);
+    if(result.data){
+      accessSettings.configured=configured;
+      accessSettings.learnerLocked=!!result.data.learnerLocked;
+      accessSettings.teacherLocked=!!result.data.teacherLocked;
+    }
+  }catch(err){
+    console.warn('Could not determine first-time setup status:',err);
+  }
+
+  if(configured){
+    document.getElementById('dashboardChoice').style.display='block';
+  }else{
+    document.getElementById('firstSetup').style.display='block';
+  }
+
+  if(window.firebaseApi && window.firebaseApi.onAuthStateChanged){
+    window.firebaseApi.onAuthStateChanged(window.firebaseAuth,(user)=>{
+      if(!user){
+        const panel=document.getElementById('learnerDashboard');
+        if(panel) panel.dataset.authenticated='false';
+      }
+    });
+  }
+});
 </script>
 <script>
 if ('serviceWorker' in navigator) {

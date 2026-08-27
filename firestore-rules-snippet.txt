@@ -1,0 +1,7 @@
+// Add this match to your existing Firestore rules.
+// The app never needs direct client access to this document.
+// Cloud Functions use the Admin SDK, which bypasses Firestore Security Rules.
+
+match /schoolAccess/main {
+  allow read, write: if false;
+}
