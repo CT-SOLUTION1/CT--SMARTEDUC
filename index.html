@@ -157,6 +157,15 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
   </div>
 </div>
 
+<div id="noNetworkPanel" class="dashboard-panel">
+  <div class="access-box" style="text-align:center">
+    <div style="font-size:2.6rem;margin-bottom:6px">📡</div>
+    <h2 style="margin-bottom:6px">No Network</h2>
+    <p class="info">Connect to the internet to access CT-SMART EDUC.</p>
+    <button class="blue wide" type="button" onclick="location.reload()">Retry</button>
+  </div>
+</div>
+
 <div id="dashboardChoice">
   <div class="card">
     <h1 style="text-align:center;margin-bottom:8px">Choose Your Dashboard</h1>
@@ -413,6 +422,7 @@ function connectGoogleMeet(){
 }
 function hideDashboards(){
   document.getElementById('firstSetup').style.display='none';
+  document.getElementById('noNetworkPanel').style.display='none';
   document.getElementById('dashboardChoice').style.display='none';
   document.getElementById('teacherAccess').style.display='none';
   document.getElementById('teacherDashboard').style.display='none';
@@ -596,6 +606,24 @@ async function initializeSchool(){
   status.textContent='Connecting to Firebase Authentication...';
 
   try{
+    // GATE: re-confirm directly against Firebase, at the moment of
+    // activation, that the system is not already configured. This is the
+    // authoritative check — it does not rely on whatever state got this
+    // screen displayed, so first-time setup can never be re-run just
+    // because the setup panel happened to be visible (e.g. from a stale
+    // page, a bookmarked URL, or a failed initial connectivity check).
+    // Once configured, changing codes is only possible from the Founder
+    // dashboard, authenticated as the Founder.
+    const alreadyConfigured=await readPublicAccess();
+    if(alreadyConfigured?.configured){
+      status.textContent='❌ CT-SMART EDUC is already activated. Only the Founder can change codes, from the Founder Dashboard.';
+      button.disabled=false;
+      button.textContent='Save & Activate CT-SMART EDUC';
+      hideDashboards();
+      document.getElementById('dashboardChoice').style.display='block';
+      return;
+    }
+
     // 1) Create (or verify) the real Founder Firebase Authentication account
     //    on the PRIMARY auth instance — this becomes the active session.
     let credential;
@@ -683,6 +711,12 @@ async function initializeSchool(){
 
   }catch(err){
     console.error('CT-SMART activation error:',err);
+    if(isNetworkError(err)){
+      status.textContent=networkErrorMessage();
+      button.disabled=false;
+      button.textContent='Save & Activate CT-SMART EDUC';
+      return;
+    }
     const code=err?.code ? ` (${err.code})` : '';
     const message=err?.message || 'Activation failed.';
     status.textContent=`❌ ${message}${code}`;
@@ -738,12 +772,19 @@ function openFounderAccess(){
   setTimeout(()=>document.getElementById('founderAccessCode').focus(),50);
 }
 
+function isNetworkError(err){
+  return err?.code==='auth/network-request-failed' || err?.code==='unavailable' || !navigator.onLine;
+}
+function networkErrorMessage(){
+  return '📡 No Network. Connect to the internet to access CT-SMART EDUC.';
+}
+
 async function verifyTeacherAccess(){
   try{
     await verifySharedCode('teacher',document.getElementById('teacherAccessCode').value);
     hideDashboards();
     document.getElementById('teacherDashboard').style.display='block';
-  }catch(err){ alert(err.message); }
+  }catch(err){ alert(isNetworkError(err)?networkErrorMessage():err.message); }
 }
 
 async function verifyFounderAccess(){
@@ -757,6 +798,7 @@ async function verifyFounderAccess(){
     await loadFounderSettings();
   }catch(err){
     console.error(err);
+    if(isNetworkError(err)){ alert(networkErrorMessage()); return; }
     alert('Incorrect Founder access code or Founder account is not configured.');
   }
 }
@@ -773,7 +815,7 @@ async function authenticateLearner(){
     return true;
   }catch(err){
     document.getElementById('learnerDashboard').dataset.authenticated='false';
-    alert(err.message);
+    alert(isNetworkError(err)?networkErrorMessage():err.message);
     return false;
   }
 }
@@ -998,7 +1040,15 @@ function escapeHtml(s){const d=document.createElement('div');d.textContent=s;ret
 <script>
 window.addEventListener('load',async()=>{
   hideDashboards();
-  let configured=false;
+  // SECURITY DEFAULT: the setup screen must be shown ONLY when we
+  // positively confirm, via a successful read from Firebase, that the
+  // system is unconfigured. If that read fails for ANY reason (no network,
+  // Firebase unreachable, etc.), we never guess — we show a plain "No
+  // Network" screen and stop, since guessing wrong in either direction is
+  // unsafe: showing the setup screen again would let anyone reset the
+  // codes, and showing the normal dashboard would let people try (and
+  // fail) to use features that need that same connection anyway.
+  let configured=null;
   try{
     const data=await readPublicAccess();
     configured=!!(data&&data.configured);
@@ -1006,10 +1056,24 @@ window.addEventListener('load',async()=>{
     accessSettings.teacherLocked=!!data?.teacherLocked;
     accessSettings.learnerLocked=!!data?.learnerLocked;
   }catch(err){
-    console.warn('Could not determine first-time setup status:',err);
+    console.warn('Could not reach the server to determine setup status:',err);
+    if(isNetworkError(err)){
+      // Genuine connectivity problem — show the No Network screen.
+      configured=null;
+    }else{
+      // Some other error (e.g. a permissions or config issue unrelated to
+      // connectivity). The network itself is fine, so we must not show
+      // the "No Network" banner here — fail safe to the normal dashboard
+      // instead, since we still must never expose the setup screen when
+      // we can't positively confirm the system is unconfigured.
+      configured=true;
+    }
   }
 
-  if(configured){
+  if(configured===null){
+    document.getElementById('noNetworkPanel').style.display='block';
+    return;
+  }else if(configured){
     document.getElementById('dashboardChoice').style.display='block';
   }else{
     document.getElementById('firstSetup').style.display='block';
