@@ -105,24 +105,24 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
     </div>
 
     <label>Founder Code</label>
-    <input id="setupFounderCode" type="password" autocomplete="new-password" placeholder="Create Founder code">
+    <input id="setupFounderCode" type="password" autocomplete="new-password" placeholder="4-character Founder code" maxlength="4" minlength="4">
 
     <label>Confirm Founder Code</label>
-    <input id="setupFounderConfirm" type="password" autocomplete="new-password" placeholder="Confirm Founder code">
+    <input id="setupFounderConfirm" type="password" autocomplete="new-password" placeholder="Confirm 4-character code" maxlength="4" minlength="4">
 
     <label>Teacher Code (minimum 16 characters)</label>
-    <input id="setupTeacherCode" type="password" autocomplete="new-password" placeholder="Create Teacher code">
+    <input id="setupTeacherCode" type="password" autocomplete="new-password" placeholder="4-character Teacher code" maxlength="4" minlength="4">
 
     <label>Confirm Teacher Code</label>
-    <input id="setupTeacherConfirm" type="password" autocomplete="new-password" placeholder="Confirm Teacher code">
+    <input id="setupTeacherConfirm" type="password" autocomplete="new-password" placeholder="Confirm 4-character code" maxlength="4" minlength="4">
 
     <label>Shared Learner Code (minimum 16 characters)</label>
     <input id="setupLearnerCode" type="password" autocomplete="new-password" placeholder="Create one code for all learners">
 
     <label>Confirm Learner Code</label>
-    <input id="setupLearnerConfirm" type="password" autocomplete="new-password" placeholder="Confirm Learner code">
+    <input id="setupLearnerConfirm" type="password" autocomplete="new-password" placeholder="Confirm 4-character code" maxlength="4" minlength="4">
 
-    <button class="green wide" onclick="initializeSchool()">Save & Activate CT-SMART EDUC</button>
+    <button id="activateSystemBtn" class="green wide" type="button" onclick="initializeSchool()">Save & Activate CT-SMART EDUC</button>
     <p id="setupStatus" class="info" style="margin-top:12px;text-align:center"></p>
   </div>
 </div>
@@ -220,7 +220,7 @@ footer{background:var(--navy);color:#dbe6f2;text-align:center;padding:25px;font-
     <label>Current Teacher Access Code</label>
     <input id="currentTeacherCode" type="password" readonly>
     <label>New Teacher Access Code (minimum 16 characters)</label>
-    <input id="newTeacherCode" type="password" placeholder="Enter a new code">
+    <input id="newTeacherCode" type="password" placeholder="Enter exactly 4 characters" maxlength="4" minlength="4">
     <button id="saveBothAccessCodes" class="green wide" type="button" onclick="saveBothAccessCodes()">Save Teacher + Learner Codes Securely</button>
 
     <button class="blue wide" onclick="changeTeacherAccessCode()">Change Teacher Access Code</button>
@@ -436,9 +436,8 @@ async function hashAccessCode(code,salt){
 }
 
 function validateFounderCode(code){
-  const clean=normalizeCode(code);
-  if(clean.length<MIN_FOUNDER_CODE_LENGTH || clean.length>64){
-    throw new Error(`Founder code must contain at least ${MIN_FOUNDER_CODE_LENGTH} characters.`);
+  return (code||'').trim();
+} characters.`);
   }
   return clean;
 }
@@ -506,16 +505,29 @@ async function loadAccessSettings(){
 }
 
 async function initializeSchool(){
+  const status=document.getElementById('setupStatus');
+  const button=document.getElementById('activateSystemBtn');
+
   const founder=validateFounderCode(document.getElementById('setupFounderCode').value);
   const founderConfirm=validateFounderCode(document.getElementById('setupFounderConfirm').value);
   const teacher=validateSharedCode(document.getElementById('setupTeacherCode').value,'Teacher code');
   const teacherConfirm=validateSharedCode(document.getElementById('setupTeacherConfirm').value,'Teacher code');
   const learner=validateSharedCode(document.getElementById('setupLearnerCode').value,'Learner code');
   const learnerConfirm=validateSharedCode(document.getElementById('setupLearnerConfirm').value,'Learner code');
-  const status=document.getElementById('setupStatus');
 
-  if(founder!==founderConfirm || teacher!==teacherConfirm || learner!==learnerConfirm){
-    status.textContent='The confirmation codes do not match.';
+  if(founder.length!==4){ status.textContent='Founder code must be exactly 4 characters.'; return; }
+  if(teacher.length!==4){ status.textContent='Teacher code must be exactly 4 characters.'; return; }
+  if(learner.length!==4){ status.textContent='Learner code must be exactly 4 characters.'; return; }
+  if(founder!==founderConfirm){
+    status.textContent='Founder code and confirmation do not match.';
+    return;
+  }
+  if(teacher!==teacherConfirm){
+    status.textContent='Teacher code and confirmation do not match.';
+    return;
+  }
+  if(learner!==learnerConfirm){
+    status.textContent='Learner code and confirmation do not match.';
     return;
   }
   if(new Set([founder,teacher,learner]).size<3){
@@ -523,28 +535,45 @@ async function initializeSchool(){
     return;
   }
 
-  status.textContent='Creating the secure Founder account...';
+  button.disabled=true;
+  button.textContent='Saving securely...';
+  status.textContent='Connecting to Firebase Authentication...';
+
   try{
+    // First create the real Founder Firebase Authentication account.
     let credential;
     try{
       credential=await window.firebaseApi.createUserWithEmailAndPassword(
-        window.firebaseAuth,FOUNDER_EMAIL,founder
+        window.firebaseAuth, FOUNDER_EMAIL, founder
       );
     }catch(err){
+      // If the Founder account already exists, authenticate it with the
+      // supplied Founder code instead of failing silently.
       if(err.code==='auth/email-already-in-use'){
+        status.textContent='Founder account already exists. Verifying Founder code...';
         credential=await window.firebaseApi.signInWithEmailAndPassword(
-          window.firebaseAuth,FOUNDER_EMAIL,founder
+          window.firebaseAuth, FOUNDER_EMAIL, founder
         );
       }else{
         throw err;
       }
     }
 
-    if(credential.user.email!==FOUNDER_EMAIL) throw new Error('Founder account could not be verified.');
+    const user=credential.user;
+    if(!user || user.email!==FOUNDER_EMAIL){
+      throw new Error('Founder authentication could not be verified.');
+    }
 
-    const existing=await readPublicAccess();
-    if(existing?.configured){
-      throw new Error('School access has already been configured.');
+    status.textContent='Founder verified. Saving Teacher and Learner codes...';
+
+    const existingAdmin=await (async()=>{
+      const snap=await window.firebaseApi.getDoc(ACCESS_ADMIN_DOC);
+      return snap.exists()?snap.data():null;
+    })();
+
+    // Do not block recovery if a previous attempt created only part of setup.
+    if(existingAdmin?.configured && existingAdmin.founderUid!==user.uid){
+      throw new Error('This CT-SMART system is already configured by another Founder account.');
     }
 
     const teacherSalt=randomHex(16);
@@ -554,10 +583,11 @@ async function initializeSchool(){
 
     await window.firebaseApi.setDoc(ACCESS_ADMIN_DOC,{
       configured:true,
-      founderUid:credential.user.uid,
+      founderUid:user.uid,
+      founderEmail:FOUNDER_EMAIL,
       updatedAt:window.firebaseApi.serverTimestamp(),
-      initializedAt:window.firebaseApi.serverTimestamp()
-    });
+      initializedAt:existingAdmin?.initializedAt || window.firebaseApi.serverTimestamp()
+    },{merge:true});
 
     await window.firebaseApi.setDoc(ACCESS_PUBLIC_DOC,{
       configured:true,
@@ -570,18 +600,40 @@ async function initializeSchool(){
       teacherLocked:false,
       learnerLocked:false,
       updatedAt:window.firebaseApi.serverTimestamp()
-    });
+    },{merge:true});
 
-    status.textContent='System activated successfully on the free Firebase Spark plan.';
     accessSettings.configured=true;
-    hideDashboards();
-    document.getElementById('dashboardChoice').style.display='block';
+    accessSettings.teacherLocked=false;
+    accessSettings.learnerLocked=false;
+
+    status.textContent='✅ CT-SMART EDUC is activated. Codes are saved in Firebase for all devices.';
+    button.textContent='Activated ✓';
+
+    document.getElementById('setupFounderCode').value='';
+    document.getElementById('setupFounderConfirm').value='';
+    document.getElementById('setupTeacherCode').value='';
+    document.getElementById('setupTeacherConfirm').value='';
+    document.getElementById('setupLearnerCode').value='';
+    document.getElementById('setupLearnerConfirm').value='';
+
+    setTimeout(()=>{
+      hideDashboards();
+      document.getElementById('dashboardChoice').style.display='block';
+      button.disabled=false;
+      button.textContent='Save & Activate CT-SMART EDUC';
+    },900);
+
   }catch(err){
-    console.error('Initial setup failed:',err);
-    status.textContent=err?.message || 'Initial setup failed.';
-    alert(err?.message || 'Initial setup failed.');
+    console.error('CT-SMART activation error:',err);
+    const code=err?.code ? ` (${err.code})` : '';
+    const message=err?.message || 'Activation failed.';
+    status.textContent=`❌ ${message}${code}`;
+    alert(`CT-SMART could not be activated.\n\n${message}${code}\n\nCheck Firebase Authentication and Firestore Rules.`);
+    button.disabled=false;
+    button.textContent='Save & Activate CT-SMART EDUC';
   }
 }
+window.initializeSchool=initializeSchool;
 
 function openTeacherAccess(){
   hideDashboards();
@@ -867,3 +919,14 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+<script>window.saveBothAccessCodes=saveBothAccessCodes;</script>
+
+<script>window.changeTeacherAccessCode=changeTeacherAccessCode;</script>
+
+<script>window.changeLearnerAccessCode=changeLearnerAccessCode;</script>
+
+<script>window.saveLocks=saveLocks;</script>
+
+<script>window.lockAllUsers=lockAllUsers;</script>
+
+<script>window.unlockAllUsers=unlockAllUsers;</script>
