@@ -456,10 +456,20 @@ const SYSTEM_ROLE_IDENTITIES = {
   teacher:{email:'teacher@ctsmart.educ',linkId:'teacher'},
   learner:{email:'learner@ctsmart.educ',linkId:'learner'}
 };
-const ACCESS_PUBLIC_DOC=window.firebaseApi.doc(window.firebaseDb,'schoolAccess','public');
-const ACCESS_ADMIN_DOC=window.firebaseApi.doc(window.firebaseDb,'schoolAccess','admin');
 const MIN_SHARED_CODE_LENGTH=6;
 const MAX_SHARED_CODE_LENGTH=6;
+// These are computed lazily (as functions, not top-level consts) so that
+// a slow-loading Firebase module script (type="module", fetched over the
+// network) can never crash this classic <script> block before it finishes
+// running. If window.firebaseApi/firebaseDb weren't ready yet, computing
+// these eagerly at parse time would throw and leave everything below
+// (like MIN_SHARED_CODE_LENGTH) permanently uninitialized.
+function getPublicAccessDoc(){
+  return window.firebaseApi.doc(window.firebaseDb,'schoolAccess','public');
+}
+function getAdminAccessDoc(){
+  return window.firebaseApi.doc(window.firebaseDb,'schoolAccess','admin');
+}
 
 function normalizeCode(code){
   return (code||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
@@ -488,14 +498,14 @@ function isFounder(){
 }
 
 async function readPublicAccess(){
-  const snap=await window.firebaseApi.getDoc(ACCESS_PUBLIC_DOC);
+  const snap=await window.firebaseApi.getDoc(getPublicAccessDoc());
   if(!snap.exists()) return null;
   return snap.data();
 }
 
 async function readAdminAccess(){
   if(!isFounder()) throw new Error('Founder authentication is required.');
-  const snap=await window.firebaseApi.getDoc(ACCESS_ADMIN_DOC);
+  const snap=await window.firebaseApi.getDoc(getAdminAccessDoc());
   if(!snap.exists()) return null;
   return snap.data();
 }
@@ -612,7 +622,7 @@ async function initializeSchool(){
     status.textContent='Founder verified. Creating Teacher and Learner accounts...';
 
     const existingAdmin=await (async()=>{
-      const snap=await window.firebaseApi.getDoc(ACCESS_ADMIN_DOC);
+      const snap=await window.firebaseApi.getDoc(getAdminAccessDoc());
       return snap.exists()?snap.data():null;
     })();
 
@@ -631,7 +641,7 @@ async function initializeSchool(){
 
     status.textContent='Accounts ready. Saving settings...';
 
-    await window.firebaseApi.setDoc(ACCESS_ADMIN_DOC,{
+    await window.firebaseApi.setDoc(getAdminAccessDoc(),{
       configured:true,
       founderUid:user.uid,
       founderEmail:FOUNDER_EMAIL,
@@ -641,7 +651,7 @@ async function initializeSchool(){
       initializedAt:existingAdmin?.initializedAt || window.firebaseApi.serverTimestamp()
     },{merge:true});
 
-    await window.firebaseApi.setDoc(ACCESS_PUBLIC_DOC,{
+    await window.firebaseApi.setDoc(getPublicAccessDoc(),{
       configured:true,
       teacherAccount:SYSTEM_ROLE_IDENTITIES.teacher,
       learnerAccount:SYSTEM_ROLE_IDENTITIES.learner,
@@ -813,14 +823,14 @@ async function changeSystemAccountCode(role,newCode){
   await window.firebaseApi.signOut(window.firebaseSecondaryAuth);
 
   const patch=role==='teacher'?{teacherCode:newCode}:{learnerCode:newCode};
-  await window.firebaseApi.setDoc(ACCESS_ADMIN_DOC,{
+  await window.firebaseApi.setDoc(getAdminAccessDoc(),{
     ...founderData,
     ...patch,
     updatedAt:window.firebaseApi.serverTimestamp()
   },{merge:true});
 
   const pub=await readPublicAccess();
-  await window.firebaseApi.setDoc(ACCESS_PUBLIC_DOC,{
+  await window.firebaseApi.setDoc(getPublicAccessDoc(),{
     ...pub,
     updatedAt:window.firebaseApi.serverTimestamp()
   },{merge:true});
@@ -902,7 +912,7 @@ async function saveLocks(){
       throw new Error('Founder authentication is required.');
     }
     const pub=await readPublicAccess();
-    await window.firebaseApi.setDoc(ACCESS_PUBLIC_DOC,{
+    await window.firebaseApi.setDoc(getPublicAccessDoc(),{
       ...pub,
       teacherLocked:document.getElementById('lockTeacher').checked,
       learnerLocked:document.getElementById('lockLearner').checked,
