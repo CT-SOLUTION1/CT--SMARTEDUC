@@ -1,40 +1,61 @@
-# CT-SMART EDUC — secure Founder code management
+# CT-SMART EDUC — Firebase Spark Access System
 
-This backend stores the Founder, Teacher and Learner access codes as salted scrypt hashes in Firestore. The plain-text codes are never stored in Firestore.
+This version is designed to remain on the Firebase **Spark (no-cost) plan**.
 
-## Files
+## What it provides
 
-- `functions/index.js` — secure callable Cloud Functions.
-- `functions/package.json` — Node 22 dependencies.
-- `index.html` — patched client so Founder/Teacher/Learner sign in with Firebase custom tokens after the Cloud Function verifies the code.
-- `firestore-rules-snippet.txt` — rule for preventing direct client access to the access-code document.
+- No anonymous Firebase Authentication accounts.
+- One real Firebase Authentication account is used for the Founder:
+  `founder@ctsmart.educ`
+- The Founder enters only the Founder code; the email is internal.
+- Teacher and Learner have system-generated application identities:
+  - `teacher@ctsmart.educ`
+  - `learner@ctsmart.educ`
+- Teacher and Learner enter only their access codes.
+- The Founder can set/change Teacher and Learner codes from the Founder Panel.
+- Codes are salted and SHA-256 hashed before being saved in Firestore.
+- The current code hashes and salts are stored in `schoolAccess/public`.
+- Only the Founder can write `schoolAccess/public` and `schoolAccess/admin`.
+- Other devices read the current public verification record and therefore use the latest saved codes.
+- No Cloud Functions are used.
 
-## Deploy
+## Important security limitation
 
-From the Firebase project root:
+Because this is Spark-only and has no trusted server-side Admin SDK, Teacher/Learner code verification must happen in the browser. That means the verification hash is readable by the browser. This is why the access codes MUST be long and randomly generated (preferably 24–32+ characters), not short PINs such as `1234`.
 
-```bash
-firebase login
-firebase use ct-e-school-solutions
-cd functions
-npm install
-cd ..
-firebase deploy --only functions
-```
+This design is appropriate for an access gate, but it is not equivalent to server-side password authentication.
 
-The frontend is already configured for `us-central1`, so the deployed functions use the same region.
+## Firebase setup
 
-## First use
+1. Keep the project on Spark.
+2. In Firebase Console, enable **Authentication > Email/Password**.
+3. Create the Founder account:
+   `founder@ctsmart.educ`
+   using the Founder code you want initially.
+4. Create/enable Firestore.
+5. Publish `firestore.rules`.
+6. Deploy the `index.html` through your existing GitHub/Vercel workflow.
+7. Open the site and complete first-time setup if `schoolAccess/public` has not yet been configured.
 
-1. Open the website.
-2. The First-Time Setup asks the Founder to create all three codes.
-3. `initializeSchoolAccess` hashes and stores the codes securely.
-4. The Founder enters the Founder code.
-5. The Founder Panel can then change Teacher and Learner codes.
-6. Other devices call the verification functions and receive Firebase-authenticated custom tokens.
+## Founder code changes
 
-## Important
+After initial setup:
 
-Do not put the code values or their hashes in `index.html`, GitHub, Vercel environment variables, or localStorage.
+Founder Panel
+→ enter new Teacher code
+→ enter new Learner code
+→ Save
 
-For stronger abuse protection in production, enable Firebase App Check enforcement for these callable functions. Firebase callable functions automatically carry Firebase Authentication and App Check tokens when available.
+The browser generates a new random salt for each code, hashes the codes, and writes the new values to Firestore. Other devices retrieve the new record and verify the new codes.
+
+## Do not
+
+- Do not use short codes.
+- Do not publish the actual codes in GitHub.
+- Do not add a broad `allow read, write: if true` Firestore rule.
+- Do not enable anonymous authentication.
+- Do not put the raw codes into Firestore.
+
+## Why no Cloud Functions?
+
+Firebase's current pricing documentation lists Cloud Functions as unavailable on Spark; access to Cloud Functions requires Blaze. Firestore and most Firebase Authentication options have no-cost Spark usage.

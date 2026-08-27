@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The Founder is the only Firebase Authentication account used by the
+    // administration layer. Teacher and Learner use application access codes;
+    // they are NOT anonymous Firebase accounts.
+    function isFounder() {
+      return request.auth != null
+        && request.auth.token.email == 'founder@ctsmart.educ';
+    }
+
+    // Teacher/Learner browsers must read the public verification record so
+    // they can verify a long, high-entropy code locally on the Spark plan.
+    // Therefore NEVER use short PINs here. Use random 24+ character codes.
+    match /schoolAccess/public {
+      allow read: if true;
+      allow create, update: if isFounder();
+      allow delete: if false;
+    }
+
+    // Founder-only administration metadata.
+    match /schoolAccess/admin {
+      allow read, create, update: if isFounder();
+      allow delete: if false;
+    }
+
+    // Lock everything else by default. Add explicit rules for your other
+    // application collections as your project grows.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
